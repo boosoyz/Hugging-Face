@@ -1,7 +1,16 @@
 name: Build and Push QingLong Docker Image
 
 on:
-  workflow_dispatch:  # ✅ 仅支持手动触发
+  push:
+    branches: [ main ]
+    paths:
+      - 'QingLong/services.json'
+      - 'QingLong/notify.py'
+      - 'QingLong/front.conf'
+      - 'QingLong/docker-entrypoint.sh'
+      - 'QingLong/README.md'
+      - 'QingLong/Dockerfile'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -27,7 +36,7 @@ jobs:
       - name: 📂 提取 REMOTE_FOLDER 并生成标签
         id: taginfo
         run: |
-          # 提取 docker-entrypoint.sh 中的 REMOTE_FOLDER 变量
+          # 提取 docker-entrypoint.sh 中的 REMOTE_FOLDER 变量（兼容有缩进的写法）
           remote_folder=$(grep -E 'REMOTE_FOLDER\s*=' QingLong/docker-entrypoint.sh | sed -E 's/.*REMOTE_FOLDER\s*=\s*"([^"]*)".*/\1/')
 
           if [ -z "$remote_folder" ]; then
@@ -37,9 +46,11 @@ jobs:
 
           echo "✅ 提取的 REMOTE_FOLDER: $remote_folder"
 
-          # 将 : 和 / 替换为点，确保合法标签
+          # 将 : 和 / 替换为单个点，避免非法 Docker 标签
           tag_name=$(echo "$remote_folder" | sed 's/:\/\?/\./g')
+          echo "🔧 转换后的标签名: $tag_name"
 
+          # 输出环境变量
           echo "tag_name=$tag_name" >> "$GITHUB_OUTPUT"
           echo "image_name=ghcr.io/${{ github.repository_owner }}/$tag_name" >> "$GITHUB_OUTPUT"
 
