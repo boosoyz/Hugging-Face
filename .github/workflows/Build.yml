@@ -1,16 +1,7 @@
 name: Build and Push QingLong Docker Image
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'QingLong/services.json'
-      - 'QingLong/notify.py'
-      - 'QingLong/front.conf'
-      - 'QingLong/docker-entrypoint.sh'
-      - 'QingLong/README.md'
-      - 'QingLong/Dockerfile'
-  workflow_dispatch:
+  workflow_dispatch:  # ✅ 仅支持手动触发
 
 jobs:
   build:
@@ -36,8 +27,8 @@ jobs:
       - name: 📂 提取 REMOTE_FOLDER 并生成标签
         id: taginfo
         run: |
-          # 提取 docker-entrypoint.sh 中的 REMOTE_FOLDER 变量（兼容有缩进的写法）
-          remote_folder=$(grep -E 'REMOTE_FOLDER\s*=' QingLong/docker-entrypoint.sh | sed -E 's/.*REMOTE_FOLDER\s*=\s*"([^"]*)".*/\1/')
+          # 提取根目录中的 docker-entrypoint.sh 中的 REMOTE_FOLDER 变量
+          remote_folder=$(grep -E 'REMOTE_FOLDER\s*=' docker-entrypoint.sh | sed -E 's/.*REMOTE_FOLDER\s*=\s*"([^"]*)".*/\1/')
 
           if [ -z "$remote_folder" ]; then
             echo "❌ 未找到 REMOTE_FOLDER 变量，请检查 docker-entrypoint.sh"
@@ -46,18 +37,16 @@ jobs:
 
           echo "✅ 提取的 REMOTE_FOLDER: $remote_folder"
 
-          # 将 : 和 / 替换为单个点，避免非法 Docker 标签
+          # 替换 : 或 :/ 为单个点，避免不合法的标签名
           tag_name=$(echo "$remote_folder" | sed 's/:\/\?/\./g')
-          echo "🔧 转换后的标签名: $tag_name"
 
-          # 输出环境变量
           echo "tag_name=$tag_name" >> "$GITHUB_OUTPUT"
           echo "image_name=ghcr.io/${{ github.repository_owner }}/$tag_name" >> "$GITHUB_OUTPUT"
 
       - name: 📦 构建并推送 Docker 镜像
         uses: docker/build-push-action@v5
         with:
-          context: ./QingLong
+          context: .        # ✅ 根目录有 Dockerfile
           push: true
           tags: |
             ${{ steps.taginfo.outputs.image_name }}:latest
