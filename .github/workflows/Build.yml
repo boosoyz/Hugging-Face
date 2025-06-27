@@ -1,50 +1,18 @@
-name: 构建并推送 QingLong 镜像
+name: Build and Push QingLong Docker Image
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'QingLong/services.json'
-      - 'QingLong/notify.py'
-      - 'QingLong/front.conf'
-      - 'QingLong/docker-entrypoint.sh'
-      - 'QingLong/README.md'
-      - 'QingLong/Dockerfile'
-  workflow_dispatch:
+  workflow_dispatch:  # ✅ 仅支持手动触发
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # 使用最新 Ubuntu 环境
-
+    runs-on: ubuntu-latest
     permissions:
-      contents: read         # 读取代码仓库权限
-      packages: write        # 推送镜像到 GHCR 的权限
+      contents: read
+      packages: write
 
     steps:
       - name: 🧾 检出仓库代码
         uses: actions/checkout@v4
-
-      - name: 🧪 提取 REMOTE_FOLDER 并生成镜像标签
-        id: vars
-        run: |
-          # 从 docker-entrypoint.sh 中提取 REMOTE_FOLDER 变量值
-          remote_folder=$(grep -E 'REMOTE_FOLDER\s*=' QingLong/docker-entrypoint.sh | sed -E 's/.*REMOTE_FOLDER\s*=\s*"([^"]*)".*/\1/')
-
-          if [ -z "$remote_folder" ]; then
-            echo "❌ 未找到 REMOTE_FOLDER 变量，请确认 docker-entrypoint.sh 中是否定义了该变量"
-            exit 1
-          fi
-
-          echo "✅ 提取的 REMOTE_FOLDER: $remote_folder"
-
-          # 把 REMOTE_FOLDER 中的 : 或 :/ 替换成一个点，避免出现连续点号
-          tag_name=$(echo "$remote_folder" | sed 's/:\/\?/\./g')
-
-          echo "🔧 转换后的标签名: $tag_name"
-
-          # 输出环境变量供后续步骤使用
-          echo "TAG_NAME=$tag_name" >> "$GITHUB_OUTPUT"
-          echo "IMAGE_NAME=ghcr.io/${{ github.repository_owner }}/$tag_name" >> "$GITHUB_OUTPUT"
 
       - name: 🔐 登录 GitHub 容器注册表
         uses: docker/login-action@v3
@@ -56,13 +24,32 @@ jobs:
       - name: 🧱 设置 Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: 📂 提取 REMOTE_FOLDER 并生成标签
+        id: taginfo
+        run: |
+          # 提取 docker-entrypoint.sh 中的 REMOTE_FOLDER 变量
+          remote_folder=$(grep -E 'REMOTE_FOLDER\s*=' QingLong/docker-entrypoint.sh | sed -E 's/.*REMOTE_FOLDER\s*=\s*"([^"]*)".*/\1/')
+
+          if [ -z "$remote_folder" ]; then
+            echo "❌ 未找到 REMOTE_FOLDER 变量，请检查 docker-entrypoint.sh"
+            exit 1
+          fi
+
+          echo "✅ 提取的 REMOTE_FOLDER: $remote_folder"
+
+          # 将 : 和 / 替换为点，确保合法标签
+          tag_name=$(echo "$remote_folder" | sed 's/:\/\?/\./g')
+
+          echo "tag_name=$tag_name" >> "$GITHUB_OUTPUT"
+          echo "image_name=ghcr.io/${{ github.repository_owner }}/$tag_name" >> "$GITHUB_OUTPUT"
+
       - name: 📦 构建并推送 Docker 镜像
         uses: docker/build-push-action@v5
         with:
-          context: ./QingLong                          # Dockerfile 所在目录
-          push: true                                   # 构建完成后推送镜像
+          context: ./QingLong
+          push: true
           tags: |
-            ${{ steps.vars.outputs.IMAGE_NAME }}:latest
+            ${{ steps.taginfo.outputs.image_name }}:latest
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.description=QingLong Docker Image
