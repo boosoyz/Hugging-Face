@@ -9,6 +9,7 @@ ARG QL_BRANCH=debian
 ENV QL_DIR=/ql \
   QL_BRANCH=${QL_BRANCH}
 
+
 COPY --from=nodebuilder /usr/local/bin/node /usr/local/bin/
 COPY --from=nodebuilder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
 RUN set -x && \
